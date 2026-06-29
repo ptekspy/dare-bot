@@ -57,6 +57,9 @@ async function onRequest(
 
   const parsedUrl = new URL(url, "https://devvit.local");
   const endpoint = parsedUrl.pathname as ApiEndpoint;
+  if (endpoint.startsWith("/internal/")) {
+    console.log(`Incoming internal request: ${(req.method ?? "GET").toUpperCase()} ${endpoint}`);
+  }
 
   let body: ApiResponse | UiResponse | ErrorResponse;
   switch (endpoint) {
@@ -152,7 +155,7 @@ async function onPlaybookPostCreate(
   const result = await trackTriggerPostAndComment(
     event.post,
     event.author?.name,
-    event.subreddit?.name,
+    event.subreddit?.name ?? event.post?.subredditName,
   );
 
   console.log(`Playbook post create: ${JSON.stringify(result)}`);
@@ -162,11 +165,12 @@ async function onPlaybookPostCreate(
 async function onPlaybookPostFlairUpdate(
   req: IncomingMessage,
 ): Promise<TriggerResponse> {
+  console.log("Playbook post flair update trigger received");
   const event = assertPostFlairUpdateEvent(await readJSON(req));
   const result = await handleTriggerPostFlairUpdate(
     event.post,
     event.author?.name,
-    event.subreddit?.name,
+    event.subreddit?.name ?? event.post?.subredditName,
   );
 
   console.log(`Playbook post flair update: ${JSON.stringify(result)}`);
@@ -280,30 +284,28 @@ function hasName(value: unknown): value is { name: string } {
 
 function hasPostPayload(value: unknown): value is {
   id: string;
-  title: string;
-  permalink: string;
-  createdAt: number;
+  title?: string;
+  permalink?: string;
+  createdAt?: number;
   linkFlair?: { text?: string };
   selftext?: string;
+  subredditName?: string;
 } {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.title === "string" &&
-    typeof value.permalink === "string" &&
-    typeof value.createdAt === "number"
+    typeof value.id === "string"
   );
 }
 
 function assertPostCreateEvent(value: unknown): OnPostCreateRequest {
-  if (!isRecord(value) || !hasPostPayload(value.post) || !hasName(value.subreddit)) {
+  if (!isRecord(value) || !hasPostPayload(value.post)) {
     throw new HttpError(400, "invalid post create payload");
   }
   return value as OnPostCreateRequest;
 }
 
 function assertPostFlairUpdateEvent(value: unknown): OnPostFlairUpdateRequest {
-  if (!isRecord(value) || !hasPostPayload(value.post) || !hasName(value.subreddit)) {
+  if (!isRecord(value) || !hasPostPayload(value.post)) {
     throw new HttpError(400, "invalid post flair update payload");
   }
   return value as OnPostFlairUpdateRequest;
