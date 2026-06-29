@@ -1,6 +1,13 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "dare-bot",
+  "permissions": {
+    "reddit": {
+      "enable": true,
+      "scope": "moderator"
+    },
+    "redis": true
+  },
   "server": {
     "dir": "dist/server",
     "entry": "index.js"

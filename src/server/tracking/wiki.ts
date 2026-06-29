@@ -166,7 +166,7 @@ function parseWikiLink(wikiLink: string): { subreddit: string; page: string } | 
   return undefined;
 }
 
-export async function fetchWikiTrackedItems(wikiLink: string): Promise<Dare[]> {
+export async function fetchWikiTrackedItems(wikiLink: string): Promise<TrackedItem[]> {
   const wiki = parseWikiLink(wikiLink);
   if (!wiki) {
     console.warn(`Ignoring invalid wiki link: ${wikiLink}`);

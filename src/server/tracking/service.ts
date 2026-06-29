@@ -102,7 +102,7 @@ async function getTrackedPostForMenuAction(targetId: string) {
   }
 
   const post = await reddit.getPostById(targetId as T3);
-  if (post.subredditName.toLowerCase() !== TARGET_SUBREDDIT) {
+  if (!isTargetSubreddit(post.subredditName)) {
     return { reason: "ignored non-target subreddit" };
   }
 
@@ -208,7 +208,7 @@ export async function trackTriggerPostAndComment(
   }
 
   const canonicalPost = await reddit.getPostById(thingId(post.id, "t3") as T3);
-  if (canonicalPost.subredditName.toLowerCase() !== TARGET_SUBREDDIT) {
+  if (!isTargetSubreddit(canonicalPost.subredditName)) {
     return { tracked: false, reason: "ignored non-target subreddit" };
   }
   if (
@@ -279,7 +279,7 @@ export async function handleTriggerPostFlairUpdate(
 
   if (!post.linkFlair?.text) {
     const canonicalPost = await reddit.getPostById(thingId(post.id, "t3") as T3);
-    if (canonicalPost.subredditName.toLowerCase() !== TARGET_SUBREDDIT) {
+    if (!isTargetSubreddit(canonicalPost.subredditName)) {
       return { untracked: false, reason: "ignored non-target subreddit" };
     }
     if (await trackedFlairRuleForText(canonicalPost.flair?.text)) {
@@ -310,7 +310,7 @@ export async function reviewTrackedItem(
   }
 
   const post = await reddit.getPostById(thingId(postId, "t3") as T3);
-  if (post.subredditName.toLowerCase() !== TARGET_SUBREDDIT) {
+  if (!isTargetSubreddit(post.subredditName)) {
     return { tracked: false, reason: "ignored non-target subreddit" };
   }
   const trackingRule = await trackedFlairRuleForText(post.flair?.text);

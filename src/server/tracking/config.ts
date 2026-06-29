@@ -1,4 +1,5 @@
 export const TARGET_SUBREDDIT = "daresgonewild";
+export const PLAYTEST_SUBREDDIT = "dare_bot_dev";
 export const TRACKING_WIKI_SUBREDDIT = "daresgonewild";
 export const TRACKING_WIKI_PAGE = "dares";
 export const REDIS_NAMESPACE = "tracking:v3";
@@ -31,5 +32,6 @@ export const MISSING_CONTRIBUTOR_REASON =
   "Tracked flair requires a contributor mention like u/username in the title or body.";
 
 export function isTargetSubreddit(subredditName: string | undefined): boolean {
-  return subredditName?.toLowerCase() === TARGET_SUBREDDIT;
+  const normalized = subredditName?.toLowerCase();
+  return normalized === TARGET_SUBREDDIT || normalized === PLAYTEST_SUBREDDIT;
 }
