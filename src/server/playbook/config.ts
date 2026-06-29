@@ -1,4 +1,5 @@
 export const PLAYBOOK_SUBREDDIT = "daresgonewild";
+export const PLAYBOOK_WIKI_SUBREDDIT = "daresgonewild";
 export const PLAYBOOK_WIKI_PAGE = "dares";
 export const PLAYBOOK_FLAIR = "playbook";
 export const COMMUNITY_DARE_FLAIR = "dared by";
