@@ -1,0 +1,46 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "dare-bot",
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.js"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Accept dare",
+        "description": "Mark the matched dare as verified.",
+        "location": ["post", "comment"],
+        "forUserType": "moderator",
+        "postFilter": "none",
+        "endpoint": "/internal/playbook/accept"
+      },
+      {
+        "label": "Reject dare",
+        "description": "Mark the matched dare as rejected.",
+        "location": ["post", "comment"],
+        "forUserType": "moderator",
+        "postFilter": "none",
+        "endpoint": "/internal/playbook/reject"
+      }
+    ]
+  },
+  "triggers": {
+    "onAppInstall": "/internal/on-app-install",
+    "onPostCreate": "/internal/playbook/post-create",
+    "onPostDelete": "/internal/playbook/post-delete",
+    "onPostFlairUpdate": "/internal/playbook/post-flair-update"
+  },
+  "scheduler": {
+    "tasks": {
+      "playbookBackfill": "/internal/playbook/backfill"
+    }
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types ./tools/build.ts --watch",
+    "build": "node --experimental-strip-types ./tools/build.ts --minify"
+  },
+  "dev": {
+    "subreddit": "dare_bot_dev"
+  }
+}
