@@ -44,6 +44,21 @@ export function missingDaredByQueueKey(postId: string): string {
   return `${REDIS_NAMESPACE}:missing-daredby-queued:${bareThingId(postId)}`;
 }
 
+export function trackedFlairRulesOverridesKey(subredditName?: string): string {
+  return `${REDIS_NAMESPACE}:tracked-flair-overrides:${subredditName?.toLowerCase() ?? "all"}`;
+}
+
+export function trackedFlairRulesCacheKey(subredditName?: string): string {
+  return `${REDIS_NAMESPACE}:tracked-flair-rules:${subredditName?.toLowerCase() ?? "all"}`;
+}
+
+export function wikiTrackedItemsCacheKey(
+  subredditName: string,
+  page: string,
+): string {
+  return `${REDIS_NAMESPACE}:wiki-items:${subredditName.toLowerCase()}:${page.toLowerCase()}`;
+}
+
 export function completionRecordKey(completed: CompletedDare): string {
   return bareThingId(completed.postId);
 }

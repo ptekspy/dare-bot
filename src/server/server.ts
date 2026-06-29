@@ -12,18 +12,21 @@ import type {
 } from "@devvit/web/shared";
 import {
   ApiEndpoint,
-  type UserDaresResponse,
+  type UserItemsResponse,
 } from "../shared/api.ts";
 import { once } from "node:events";
 import {
-  getUserDares,
+  configureTrackedFlairFromPost,
+  getUserItems,
   handleTriggerPostFlairUpdate,
   removeCompletionForDeletedPost,
-  reviewPlaybookDare,
+  removeTrackedFlairFromPost,
+  reviewTrackedItem,
   runBackfillChunk,
+  syncTrackedFlairRules,
   trackTriggerPostAndComment,
   type BackfillTaskData,
-} from "./playbook.ts";
+} from "./tracking.ts";
 
 const MAX_JSON_BODY_BYTES = 128 * 1024;
 
@@ -63,37 +66,53 @@ async function onRequest(
 
   let body: ApiResponse | UiResponse | ErrorResponse;
   switch (endpoint) {
-    case ApiEndpoint.UserDares:
+    case ApiEndpoint.UserItems:
       requireMethod(req, "GET");
-      body = await onUserDares(parsedUrl);
+      body = await onUserItems(parsedUrl);
       break;
     case ApiEndpoint.OnAppInstall:
       requireMethod(req, "POST");
       body = await onAppInstall();
       break;
-    case ApiEndpoint.OnPlaybookPostCreate:
+    case ApiEndpoint.OnTrackedPostCreate:
       requireMethod(req, "POST");
-      body = await onPlaybookPostCreate(req);
+      body = await onTrackedPostCreate(req);
       break;
-    case ApiEndpoint.OnPlaybookPostFlairUpdate:
+    case ApiEndpoint.OnTrackedPostFlairUpdate:
       requireMethod(req, "POST");
-      body = await onPlaybookPostFlairUpdate(req);
+      body = await onTrackedPostFlairUpdate(req);
       break;
-    case ApiEndpoint.OnPlaybookPostDelete:
+    case ApiEndpoint.OnTrackedPostDelete:
       requireMethod(req, "POST");
-      body = await onPlaybookPostDelete(req);
+      body = await onTrackedPostDelete(req);
       break;
-    case ApiEndpoint.OnPlaybookBackfill:
+    case ApiEndpoint.OnTrackedBackfill:
       requireMethod(req, "POST");
-      body = await onPlaybookBackfill(req);
+      body = await onTrackedBackfill(req);
       break;
-    case ApiEndpoint.OnPlaybookAccept:
+    case ApiEndpoint.OnTrackedAccept:
       requireMethod(req, "POST");
-      body = await onReviewPlaybookDare(req, "accepted");
+      body = await onReviewTrackedItem(req, "accepted");
       break;
-    case ApiEndpoint.OnPlaybookReject:
+    case ApiEndpoint.OnTrackedReject:
       requireMethod(req, "POST");
-      body = await onReviewPlaybookDare(req, "rejected");
+      body = await onReviewTrackedItem(req, "rejected");
+      break;
+    case ApiEndpoint.OnTrackingEnableContributors:
+      requireMethod(req, "POST");
+      body = await onConfigureTrackingFromPost(req, true);
+      break;
+    case ApiEndpoint.OnTrackingDisableContributors:
+      requireMethod(req, "POST");
+      body = await onConfigureTrackingFromPost(req, false);
+      break;
+    case ApiEndpoint.OnTrackingRemoveFlair:
+      requireMethod(req, "POST");
+      body = await onRemoveTrackingFromPost(req);
+      break;
+    case ApiEndpoint.OnTrackingSyncRules:
+      requireMethod(req, "POST");
+      body = await onSyncTrackingRules();
       break;
     default:
       endpoint satisfies never;
@@ -104,7 +123,7 @@ async function onRequest(
   writeJSON<PartialJsonValue>("status" in body ? body.status : 200, body, rsp);
 }
 
-type ApiResponse = UserDaresResponse | TriggerResponse;
+type ApiResponse = UserItemsResponse | TriggerResponse;
 
 type ErrorResponse = {
   error: string;
@@ -125,7 +144,7 @@ class HttpError extends Error {
   }
 }
 
-async function onUserDares(url: URL): Promise<UserDaresResponse | ErrorResponse> {
+async function onUserItems(url: URL): Promise<UserItemsResponse | ErrorResponse> {
   const username = url.searchParams.get("username");
   if (!username) {
     return {
@@ -141,14 +160,14 @@ async function onUserDares(url: URL): Promise<UserDaresResponse | ErrorResponse>
     };
   }
 
-  return getUserDares(username, false);
+  return getUserItems(username, false);
 }
 
 async function onAppInstall(): Promise<TriggerResponse> {
   return {};
 }
 
-async function onPlaybookPostCreate(
+async function onTrackedPostCreate(
   req: IncomingMessage,
 ): Promise<TriggerResponse> {
   const event = assertPostCreateEvent(await readJSON(req));
@@ -158,14 +177,14 @@ async function onPlaybookPostCreate(
     event.subreddit?.name ?? event.post?.subredditName,
   );
 
-  console.log(`Playbook post create: ${JSON.stringify(result)}`);
+  console.log(`Tracked post create: ${JSON.stringify(result)}`);
   return {};
 }
 
-async function onPlaybookPostFlairUpdate(
+async function onTrackedPostFlairUpdate(
   req: IncomingMessage,
 ): Promise<TriggerResponse> {
-  console.log("Playbook post flair update trigger received");
+  console.log("Tracked post flair update trigger received");
   const event = assertPostFlairUpdateEvent(await readJSON(req));
   const result = await handleTriggerPostFlairUpdate(
     event.post,
@@ -173,11 +192,11 @@ async function onPlaybookPostFlairUpdate(
     event.subreddit?.name ?? event.post?.subredditName,
   );
 
-  console.log(`Playbook post flair update: ${JSON.stringify(result)}`);
+  console.log(`Tracked post flair update: ${JSON.stringify(result)}`);
   return {};
 }
 
-async function onPlaybookPostDelete(
+async function onTrackedPostDelete(
   req: IncomingMessage,
 ): Promise<TriggerResponse> {
   const event = assertPostDeleteEvent(await readJSON(req));
@@ -187,23 +206,23 @@ async function onPlaybookPostDelete(
     event.subreddit?.name,
   );
 
-  console.log(`Tracked dare post delete: ${JSON.stringify(result)}`);
+  console.log(`Tracked post delete: ${JSON.stringify(result)}`);
   return {};
 }
 
-async function onPlaybookBackfill(req: IncomingMessage): Promise<TriggerResponse> {
+async function onTrackedBackfill(req: IncomingMessage): Promise<TriggerResponse> {
   const event = assertBackfillTask(await readJSON(req));
   await runBackfillChunk(event.data);
 
   return {};
 }
 
-async function onReviewPlaybookDare(
+async function onReviewTrackedItem(
   req: IncomingMessage,
   status: "accepted" | "rejected",
 ): Promise<UiResponse> {
   const event = assertMenuItemRequest(await readJSON(req));
-  const result = await reviewPlaybookDare(
+  const result = await reviewTrackedItem(
     event.targetId,
     status,
     context.username,
@@ -212,7 +231,7 @@ async function onReviewPlaybookDare(
   if (!result.tracked) {
     return {
       showToast: {
-        text: result.reason ?? "Could not review dare.",
+        text: result.reason ?? "Could not review item.",
         appearance: "neutral",
       },
     };
@@ -220,8 +239,55 @@ async function onReviewPlaybookDare(
 
   return {
     showToast: {
-      text: `Dare ${status}.`,
+      text: `Tracked item ${status}.`,
       appearance: "success",
+    },
+  };
+}
+
+async function onConfigureTrackingFromPost(
+  req: IncomingMessage,
+  trackContributors: boolean,
+): Promise<UiResponse> {
+  const event = assertMenuItemRequest(await readJSON(req));
+  const result = await configureTrackedFlairFromPost(
+    event.targetId,
+    trackContributors,
+    undefined,
+    context.username,
+  );
+
+  return {
+    showToast: {
+      text: result.reason,
+      appearance: result.ok ? "success" : "neutral",
+    },
+  };
+}
+
+async function onRemoveTrackingFromPost(
+  req: IncomingMessage,
+): Promise<UiResponse> {
+  const event = assertMenuItemRequest(await readJSON(req));
+  const result = await removeTrackedFlairFromPost(
+    event.targetId,
+    context.username,
+  );
+
+  return {
+    showToast: {
+      text: result.reason,
+      appearance: result.ok ? "success" : "neutral",
+    },
+  };
+}
+
+async function onSyncTrackingRules(): Promise<UiResponse> {
+  const result = await syncTrackedFlairRules(context.username);
+  return {
+    showToast: {
+      text: result.reason,
+      appearance: result.ok ? "success" : "neutral",
     },
   };
 }
@@ -327,7 +393,7 @@ function assertBackfillTask(
 ): SchedulerTaskRequest<BackfillTaskData> {
   if (
     !isRecord(value) ||
-    value.name !== "playbookBackfill" ||
+    value.name !== "trackingBackfill" ||
     !isRecord(value.data) ||
     typeof value.data.username !== "string" ||
     typeof value.data.subredditName !== "string"

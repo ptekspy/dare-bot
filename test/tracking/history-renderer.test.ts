@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildHistoryComment } from "../../src/server/playbook/history-renderer.ts";
-import type { CompletedDare } from "../../src/server/playbook/types.ts";
+import { buildHistoryComment } from "../../src/server/tracking/history-renderer.ts";
+import type { CompletedDare } from "../../src/server/tracking/types.ts";
 
 function completed(overrides: Partial<CompletedDare>): CompletedDare {
   return {
@@ -12,7 +12,7 @@ function completed(overrides: Partial<CompletedDare>): CompletedDare {
     createdUtc: 1_700_000_000,
     flair: "Playbook",
     author: "example",
-    daredBy: [],
+    contributors: [],
     status: "pending",
     ...overrides,
   };
@@ -26,7 +26,7 @@ describe("history comment rendering", () => {
         name: "Sunny day",
         title: "Sunny day daredby u/Alice",
         flair: "DARED BY",
-        daredBy: ["Alice"],
+        contributors: ["Alice"],
         postId: "community1",
       }),
     ]);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { mergeCompletion } from "../../src/server/playbook/completion-domain.ts";
-import { completionRecordKey } from "../../src/server/playbook/redis-keys.ts";
-import type { CompletedDare } from "../../src/server/playbook/types.ts";
+import { mergeCompletion } from "../../src/server/tracking/completion-domain.ts";
+import { completionRecordKey } from "../../src/server/tracking/redis-keys.ts";
+import type { CompletedDare } from "../../src/server/tracking/types.ts";
 
 function completed(overrides: Partial<CompletedDare> = {}): CompletedDare {
   return {
@@ -13,7 +13,7 @@ function completed(overrides: Partial<CompletedDare> = {}): CompletedDare {
     createdUtc: 1_700_000_000,
     flair: "Playbook",
     author: "example",
-    daredBy: [],
+    contributors: [],
     status: "pending",
     ...overrides,
   };

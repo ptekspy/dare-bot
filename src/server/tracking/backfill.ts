@@ -5,11 +5,11 @@ import {
   MAX_HISTORY_COMMENT_UPDATES_PER_RUN,
   isTargetSubreddit,
 } from "./config.ts";
-import { isCommunityDareFlair, isPlaybookFlair, isTrackedDareFlair } from "./flair.ts";
+import { trackedFlairRuleForText } from "./flair.ts";
 import { bareThingId, normalizeUsername } from "./ids.ts";
-import { matchDareFromTitle, resolveDareFromTitleAndFlair } from "./dare-matching.ts";
+import { resolveTrackedItemFromTitle } from "./dare-matching.ts";
 import { completionFromPost } from "./completion-factory.ts";
-import { getCompletedDares, saveCompletion } from "./completion-store.ts";
+import { getCompletedItems, saveCompletion } from "./completion-store.ts";
 import {
   acquireUserBackfillLock,
   clearBackfillState,
@@ -27,17 +27,18 @@ import {
   updateExistingHistoryComment,
   upsertHistoryComment,
 } from "./history-comments.ts";
-import { fetchPlaybookDares } from "./wiki.ts";
-import { hasDaredByUser } from "./text.ts";
-import type { BackfillTaskData, Dare } from "./types.ts";
+import { fetchDefaultWikiItems } from "./wiki.ts";
+import { hasContributorUser } from "./text.ts";
+import type { BackfillTaskData } from "./types.ts";
 import type { Post } from "@devvit/reddit";
+import { fetchWikiTrackedItems } from "./wiki.ts";
 
 export async function scheduleBackfillJob(
   data: BackfillTaskData,
   delayMs = 1000,
 ): Promise<void> {
   await scheduler.runJob({
-    name: "playbookBackfill",
+    name: "trackingBackfill",
     data,
     runAt: new Date(Date.now() + delayMs),
   });
@@ -62,29 +63,33 @@ export async function startBackfillUser(
 
 async function saveCompletionFromHistoricalPost(
   post: Post,
-  dares: Dare[],
+  defaultWikiItems: Awaited<ReturnType<typeof fetchDefaultWikiItems>>,
 ): Promise<void> {
-  if (!isTrackedDareFlair(post.flair?.text)) return;
+  const trackingRule = await trackedFlairRuleForText(post.flair?.text);
+  if (!trackingRule) return;
   if (
-    isCommunityDareFlair(post.flair?.text) &&
-    !hasDaredByUser(post.title, post.body)
+    trackingRule.trackContributors
+    && !hasContributorUser(post.title, post.body)
   ) {
     return;
   }
 
-  const dare = isPlaybookFlair(post.flair?.text)
-    ? matchDareFromTitle(post.title, dares)
-    : resolveDareFromTitleAndFlair(post.title, post.flair?.text, dares);
-  if (!dare) return;
+  const wikiItems = trackingRule.wikiLink
+    ? (trackingRule.wikiLink.toLowerCase() === "r/daresgonewild/wiki/dares"
+      ? defaultWikiItems
+      : await fetchWikiTrackedItems(trackingRule.wikiLink))
+    : [];
+  const trackedItem = resolveTrackedItemFromTitle(post.title, trackingRule, wikiItems);
+  if (!trackedItem) return;
 
-  await saveCompletion(completionFromPost(post, dare));
+  await saveCompletion(completionFromPost(post, trackedItem, trackingRule.trackContributors));
 }
 
 async function updateHistoryTablesAfterBackfill(
   username: string,
   subredditName?: string,
 ): Promise<void> {
-  const completed = await getCompletedDares(username);
+  const completed = await getCompletedItems(username);
   const body = buildHistoryComment(username, completed);
   const pendingPostIds = await getPendingHistoryPostIds(username, subredditName);
   const recentPostIds = completed
@@ -116,7 +121,7 @@ async function finishBackfill(
   subredditName: string | undefined,
   limit: number,
 ): Promise<void> {
-  const completed = await getCompletedDares(username);
+  const completed = await getCompletedItems(username);
   await setUserSyncMeta(username, subredditName, limit, completed.length);
   await updateHistoryTablesAfterBackfill(username, subredditName);
   await clearBackfillState(username, subredditName);
@@ -149,7 +154,7 @@ export async function runBackfillChunk(data: BackfillTaskData): Promise<void> {
       ...(state.after ? { after: state.after } : {}),
     })
     .all();
-  const dares = await fetchPlaybookDares();
+  const defaultWikiItems = await fetchDefaultWikiItems();
 
   for (const post of posts) {
     if (
@@ -159,7 +164,7 @@ export async function runBackfillChunk(data: BackfillTaskData): Promise<void> {
       continue;
     }
 
-    await saveCompletionFromHistoricalPost(post, dares);
+    await saveCompletionFromHistoricalPost(post, defaultWikiItems);
   }
 
   const processed = state.processed + posts.length;

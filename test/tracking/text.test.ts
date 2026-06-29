@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   communityDareNameFromTitle,
+  extractContributors,
   extractDaredBy,
+  hasContributorUser,
   hasDaredByUser,
   normalizeText,
-} from "../../src/server/playbook/text.ts";
+} from "../../src/server/tracking/text.ts";
 
 describe("Playbook text helpers", () => {
   it("normalizes text for forgiving matching", () => {
@@ -20,11 +22,21 @@ describe("Playbook text helpers", () => {
     ).toEqual(["Alice", "Bob"]);
   });
 
+  it("captures all unique contributors across title and body", () => {
+    expect(
+      extractContributors(
+        "dared by u/Alice and dared by u/Bob",
+        "follow-up daredby /u/Bob plus dared-by u/Charlie",
+      ),
+    ).toEqual(["Alice", "Bob", "Charlie"]);
+  });
+
   it("detects whether a DARED BY post has a user mention", () => {
     expect(hasDaredByUser("dared by u/example")).toBe(true);
     expect(hasDaredByUser("DARED BY /u/Example")).toBe(true);
     expect(hasDaredByUser("Dared-By u/Example")).toBe(true);
     expect(hasDaredByUser("dared by nobody in particular")).toBe(false);
+    expect(hasContributorUser("dared-by u/example")).toBe(true);
   });
 
   it("strips dared-by text from community dare names", () => {

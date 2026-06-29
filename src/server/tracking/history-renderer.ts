@@ -86,7 +86,7 @@ export function renderCommunityTable(
     const cells = [
       formatDate(dare.createdUtc),
       escapeTableCell(dare.name),
-      escapeTableCell(formatUsernames(dare.daredBy ?? [])),
+      escapeTableCell(formatUsernames(dare.contributors ?? [])),
       postTitleLink(dare),
     ];
     lines.push(`| ${cells.join(" | ")} |`);

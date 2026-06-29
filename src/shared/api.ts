@@ -1,4 +1,4 @@
-export type CompletedDare = {
+export type TrackedItemRecord = {
   name: string;
   level: string;
   postId: string;
@@ -7,28 +7,44 @@ export type CompletedDare = {
   createdUtc: number;
   flair: string;
   author: string;
-  daredBy: string[];
+  contributors: string[];
   status: "pending" | "accepted" | "rejected";
   reviewedBy?: string;
   reviewedAtUtc?: number;
 };
 
-export type UserDaresResponse = {
-  type: "userDares";
+export type UserItemsResponse = {
+  type: "userItems" | "userDares";
   username: string;
   count: number;
-  dares: CompletedDare[];
+  items: TrackedItemRecord[];
+  dares?: TrackedItemRecord[];
 };
 
+export type CompletedDare = TrackedItemRecord;
+export type UserDaresResponse = UserItemsResponse;
+
 export const ApiEndpoint = {
-  UserDares: "/api/user-dares",
+  UserItems: "/api/user-dares",
   OnAppInstall: "/internal/on-app-install",
-  OnPlaybookPostCreate: "/internal/playbook/post-create",
-  OnPlaybookPostFlairUpdate: "/internal/playbook/post-flair-update",
-  OnPlaybookPostDelete: "/internal/playbook/post-delete",
-  OnPlaybookBackfill: "/internal/playbook/backfill",
-  OnPlaybookAccept: "/internal/playbook/accept",
-  OnPlaybookReject: "/internal/playbook/reject",
+  OnTrackedPostCreate: "/internal/tracking/post-create",
+  OnTrackedPostFlairUpdate: "/internal/tracking/post-flair-update",
+  OnTrackedPostDelete: "/internal/tracking/post-delete",
+  OnTrackedBackfill: "/internal/tracking/backfill",
+  OnTrackedAccept: "/internal/tracking/approve",
+  OnTrackedReject: "/internal/tracking/reject",
+  OnTrackingEnableContributors: "/internal/tracking/enable-contributors",
+  OnTrackingDisableContributors: "/internal/tracking/disable-contributors",
+  OnTrackingRemoveFlair: "/internal/tracking/remove-flair",
+  OnTrackingSyncRules: "/internal/tracking/sync-rules",
+  // Compatibility endpoint keys.
+  UserDares: "/api/user-dares",
+  OnPlaybookPostCreate: "/internal/tracking/post-create",
+  OnPlaybookPostFlairUpdate: "/internal/tracking/post-flair-update",
+  OnPlaybookPostDelete: "/internal/tracking/post-delete",
+  OnPlaybookBackfill: "/internal/tracking/backfill",
+  OnPlaybookAccept: "/internal/tracking/approve",
+  OnPlaybookReject: "/internal/tracking/reject",
 } as const;
 
 export type ApiEndpoint = (typeof ApiEndpoint)[keyof typeof ApiEndpoint];

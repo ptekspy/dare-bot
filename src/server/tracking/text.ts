@@ -20,7 +20,7 @@ export function nameAliases(name: string): string[] {
   return [...aliases].filter(Boolean).sort();
 }
 
-export function extractDaredBy(...values: (string | undefined)[]): string[] {
+export function extractContributors(...values: (string | undefined)[]): string[] {
   const usernames = new Set<string>();
   const text = values.filter(Boolean).join("\n");
   const pattern =
@@ -33,9 +33,13 @@ export function extractDaredBy(...values: (string | undefined)[]): string[] {
   return [...usernames].sort((a, b) => a.localeCompare(b));
 }
 
-export function hasDaredByUser(...values: (string | undefined)[]): boolean {
-  return extractDaredBy(...values).length > 0;
+export function hasContributorUser(...values: (string | undefined)[]): boolean {
+  return extractContributors(...values).length > 0;
 }
+
+// Backwards-compatible aliases while callsites migrate to neutral names.
+export const extractDaredBy = extractContributors;
+export const hasDaredByUser = hasContributorUser;
 
 export function communityDareNameFromTitle(title: string): string {
   const stripped = title

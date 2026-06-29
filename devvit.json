@@ -8,32 +8,64 @@
   "menu": {
     "items": [
       {
-        "label": "Accept dare",
-        "description": "Mark the matched dare as verified.",
+        "label": "Approve tracked item",
+        "description": "Mark the matched tracked item as approved.",
         "location": ["post", "comment"],
         "forUserType": "moderator",
         "postFilter": "none",
-        "endpoint": "/internal/playbook/accept"
+        "endpoint": "/internal/tracking/approve"
       },
       {
-        "label": "Reject dare",
-        "description": "Mark the matched dare as rejected.",
+        "label": "Reject tracked item",
+        "description": "Mark the matched tracked item as rejected.",
         "location": ["post", "comment"],
         "forUserType": "moderator",
         "postFilter": "none",
-        "endpoint": "/internal/playbook/reject"
+        "endpoint": "/internal/tracking/reject"
+      },
+      {
+        "label": "Track this flair (contributors ON)",
+        "description": "Track this post flair and require contributor mentions.",
+        "location": ["post"],
+        "forUserType": "moderator",
+        "postFilter": "none",
+        "endpoint": "/internal/tracking/enable-contributors"
+      },
+      {
+        "label": "Track this flair (contributors OFF)",
+        "description": "Track this post flair without requiring contributor mentions.",
+        "location": ["post"],
+        "forUserType": "moderator",
+        "postFilter": "none",
+        "endpoint": "/internal/tracking/disable-contributors"
+      },
+      {
+        "label": "Stop tracking this flair",
+        "description": "Remove manual tracking for this post flair.",
+        "location": ["post"],
+        "forUserType": "moderator",
+        "postFilter": "none",
+        "endpoint": "/internal/tracking/remove-flair"
+      },
+      {
+        "label": "Sync tracking rules from wiki",
+        "description": "Refresh cached flair tracking rules from the wiki table.",
+        "location": ["post"],
+        "forUserType": "moderator",
+        "postFilter": "none",
+        "endpoint": "/internal/tracking/sync-rules"
       }
     ]
   },
   "triggers": {
     "onAppInstall": "/internal/on-app-install",
-    "onPostCreate": "/internal/playbook/post-create",
-    "onPostDelete": "/internal/playbook/post-delete",
-    "onPostFlairUpdate": "/internal/playbook/post-flair-update"
+    "onPostCreate": "/internal/tracking/post-create",
+    "onPostDelete": "/internal/tracking/post-delete",
+    "onPostFlairUpdate": "/internal/tracking/post-flair-update"
   },
   "scheduler": {
     "tasks": {
-      "playbookBackfill": "/internal/playbook/backfill"
+      "trackingBackfill": "/internal/tracking/backfill"
     }
   },
   "scripts": {

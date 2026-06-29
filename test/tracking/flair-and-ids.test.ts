@@ -3,13 +3,13 @@ import {
   isCommunityDareFlair,
   isPlaybookFlair,
   isTrackedDareFlair,
-} from "../../src/server/playbook/flair.ts";
+} from "../../src/server/tracking/flair.ts";
 import {
   bareThingId,
   normalizeUsername,
   permalinkUrl,
   thingId,
-} from "../../src/server/playbook/ids.ts";
+} from "../../src/server/tracking/ids.ts";
 
 describe("flair helpers", () => {
   it("recognizes tracked flair text case-insensitively", () => {

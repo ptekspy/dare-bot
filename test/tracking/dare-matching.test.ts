@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  matchDareFromTitle,
+  matchTrackedItemFromTitle,
   parsePlaybookDares,
   resolveDareFromTitleAndFlair,
-} from "../../src/server/playbook/dare-matching.ts";
+} from "../../src/server/tracking/dare-matching.ts";
 
 const wikiMarkdown = `
 # Dares
@@ -36,16 +36,16 @@ describe("Playbook dare matching", () => {
   it("matches normalized title aliases", () => {
     const dares = parsePlaybookDares(wikiMarkdown);
 
-    expect(matchDareFromTitle("[Playbook] doing THE door sign!", dares)?.name)
+    expect(matchTrackedItemFromTitle("[Playbook] doing THE door sign!", dares)?.name)
       .toBe("The Door Sign");
-    expect(matchDareFromTitle("Truth and Dare tonight", dares)?.name)
+    expect(matchTrackedItemFromTitle("Truth and Dare tonight", dares)?.name)
       .toBe("Truth & Dare");
   });
 
   it("chooses the longest matching dare name", () => {
     const dares = parsePlaybookDares(wikiMarkdown);
 
-    expect(matchDareFromTitle("Truth Dare Deluxe attempt", dares)?.name)
+    expect(matchTrackedItemFromTitle("Truth Dare Deluxe attempt", dares)?.name)
       .toBe("Truth Dare Deluxe");
   });
 

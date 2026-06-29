@@ -59,7 +59,7 @@ On a tracked post:
 3. If the user has never been synced, has stale sync metadata, or appears to have lost stored completions, a chunked backfill is scheduled.
 4. History tables are updated only after the backfill completes.
 
-Backfill settings live in `src/server/playbook.ts`:
+Backfill settings live in `src/server/tracking.ts`:
 
 - `DEFAULT_SCAN_LIMIT = 5000`
 - `BACKFILL_CHUNK_SIZE = 100`
@@ -70,7 +70,7 @@ The backfill cursor uses the last returned post id as Reddit's `after` token. If
 
 ## Redis Storage
 
-The Redis namespace is controlled by `REDIS_NAMESPACE` in `src/server/playbook.ts`.
+The Redis namespace is controlled by `REDIS_NAMESPACE` in `src/server/tracking.ts`.
 
 Current namespace:
 
@@ -221,14 +221,14 @@ npm run launch
 
 ## Code Map
 
-- `src/server/playbook.ts`: public facade for the Playbook modules.
-- `src/server/playbook/dare-matching.ts`: wiki markdown parsing and title matching.
-- `src/server/playbook/text.ts`: normalization and `daredby u/username` extraction.
-- `src/server/playbook/history-renderer.ts`: markdown table rendering.
-- `src/server/playbook/completion-store.ts`: Redis persistence for completed dares.
-- `src/server/playbook/sync-store.ts`: Redis persistence for backfill state and locks.
-- `src/server/playbook/backfill.ts`: chunked historical sync orchestration.
-- `src/server/playbook/service.ts`: trigger/menu/API orchestration.
+- `src/server/tracking.ts`: public facade for the Playbook modules.
+- `src/server/tracking/dare-matching.ts`: wiki markdown parsing and title matching.
+- `src/server/tracking/text.ts`: normalization and `daredby u/username` extraction.
+- `src/server/tracking/history-renderer.ts`: markdown table rendering.
+- `src/server/tracking/completion-store.ts`: Redis persistence for completed dares.
+- `src/server/tracking/sync-store.ts`: Redis persistence for backfill state and locks.
+- `src/server/tracking/backfill.ts`: chunked historical sync orchestration.
+- `src/server/tracking/service.ts`: trigger/menu/API orchestration.
 - `src/server/server.ts`: HTTP router for Devvit triggers, menu actions, scheduler tasks, and API calls.
 - `src/server/index.ts`: Devvit server bootstrap.
 - `src/shared/api.ts`: shared API endpoint constants and response types.
