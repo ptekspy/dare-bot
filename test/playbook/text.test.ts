@@ -22,6 +22,8 @@ describe("Playbook text helpers", () => {
 
   it("detects whether a DARED BY post has a user mention", () => {
     expect(hasDaredByUser("dared by u/example")).toBe(true);
+    expect(hasDaredByUser("DARED BY /u/Example")).toBe(true);
+    expect(hasDaredByUser("Dared-By u/Example")).toBe(true);
     expect(hasDaredByUser("dared by nobody in particular")).toBe(false);
   });
 

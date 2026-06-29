@@ -24,7 +24,7 @@ export function extractDaredBy(...values: (string | undefined)[]): string[] {
   const usernames = new Set<string>();
   const text = values.filter(Boolean).join("\n");
   const pattern =
-    /(?:dared\s*by|daredby|dared-by)\s*:?\s*`?\s*(?:\/?u\/)([a-zA-Z0-9_-]{3,20})/g;
+    /(?:dared\s*by|daredby|dared-by)\s*:?\s*`?\s*(?:\/?u\/)([a-zA-Z0-9_-]{3,20})/gi;
 
   for (const match of text.matchAll(pattern)) {
     if (match[1]) usernames.add(match[1]);
