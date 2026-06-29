@@ -1,0 +1,87 @@
+import { reddit, redis } from "@devvit/web/server";
+import type { Comment, Post } from "@devvit/reddit";
+import type { T3 } from "@devvit/web/shared";
+import {
+  historyCommentKey,
+  historyCommentPostKey,
+} from "./redis-keys.ts";
+import { thingId } from "./ids.ts";
+import type { CompletedDare } from "./types.ts";
+
+export async function findHistoryCommentOnPost(
+  post: Post,
+  body: string,
+): Promise<Comment | undefined> {
+  const historyHeader = body.split("\n", 1)[0] ?? "";
+  const comments = await post.comments.get(100);
+
+  return comments.find((comment) => comment.body.startsWith(historyHeader));
+}
+
+export async function upsertHistoryComment(
+  postId: string,
+  body: string,
+): Promise<Comment> {
+  const key = historyCommentKey(postId);
+  const existingCommentId = await redis.get(key);
+
+  if (existingCommentId) {
+    try {
+      const comment = await reddit.getCommentById(thingId(existingCommentId, "t1"));
+      return comment.edit({ text: body, runAs: "APP" });
+    } catch (err) {
+      console.warn(`Could not edit history comment ${existingCommentId}: ${err}`);
+    }
+  }
+
+  const post = await reddit.getPostById(thingId(postId, "t3") as T3);
+  const recoveredComment = await findHistoryCommentOnPost(post, body);
+  if (recoveredComment) {
+    await redis.set(key, recoveredComment.id);
+    await redis.set(historyCommentPostKey(recoveredComment.id), post.id);
+    return recoveredComment.edit({ text: body, runAs: "APP" });
+  }
+
+  const comment = await post.addComment({ text: body, runAs: "APP" });
+  await redis.set(key, comment.id);
+  await redis.set(historyCommentPostKey(comment.id), postId);
+  return comment;
+}
+
+export async function updateExistingHistoryComment(
+  postId: string,
+  body: string,
+): Promise<void> {
+  const existingCommentId = await redis.get(historyCommentKey(postId));
+
+  if (existingCommentId) {
+    try {
+      const comment = await reddit.getCommentById(thingId(existingCommentId, "t1"));
+      await comment.edit({ text: body, runAs: "APP" });
+      return;
+    } catch (err) {
+      console.warn(`Could not update history comment ${existingCommentId}: ${err}`);
+    }
+  }
+
+  try {
+    const post = await reddit.getPostById(thingId(postId, "t3") as T3);
+    const recoveredComment = await findHistoryCommentOnPost(post, body);
+    if (recoveredComment) {
+      await redis.set(historyCommentKey(postId), recoveredComment.id);
+      await redis.set(historyCommentPostKey(recoveredComment.id), post.id);
+      await recoveredComment.edit({ text: body, runAs: "APP" });
+    }
+  } catch (err) {
+    console.warn(`Could not recover history comment on post ${postId}: ${err}`);
+  }
+}
+
+export async function updateExistingHistoryCommentsForUser(
+  completed: CompletedDare[],
+  body: string,
+): Promise<void> {
+  await Promise.all(
+    completed.map((dare) => updateExistingHistoryComment(dare.postId, body)),
+  );
+}
