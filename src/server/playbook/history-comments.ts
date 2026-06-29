@@ -7,6 +7,10 @@ import {
 } from "./redis-keys.ts";
 import { thingId } from "./ids.ts";
 import type { CompletedDare } from "./types.ts";
+import {
+  HISTORY_COMMENT_UPDATE_CONCURRENCY,
+  MAX_HISTORY_COMMENT_UPDATES_PER_RUN,
+} from "./config.ts";
 
 export async function findHistoryCommentOnPost(
   post: Post,
@@ -81,7 +85,14 @@ export async function updateExistingHistoryCommentsForUser(
   completed: CompletedDare[],
   body: string,
 ): Promise<void> {
-  await Promise.all(
-    completed.map((dare) => updateExistingHistoryComment(dare.postId, body)),
-  );
+  const recent = [...completed]
+    .sort((a, b) => b.createdUtc - a.createdUtc || a.postId.localeCompare(b.postId))
+    .slice(0, MAX_HISTORY_COMMENT_UPDATES_PER_RUN);
+
+  for (let i = 0; i < recent.length; i += HISTORY_COMMENT_UPDATE_CONCURRENCY) {
+    const batch = recent.slice(i, i + HISTORY_COMMENT_UPDATE_CONCURRENCY);
+    await Promise.allSettled(
+      batch.map((dare) => updateExistingHistoryComment(dare.postId, body)),
+    );
+  }
 }

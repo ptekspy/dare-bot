@@ -17,13 +17,18 @@
     "node": ">=22.6.0"
   },
   "dependencies": {
-    "@devvit/web": "0.13.5",
-    "devvit": "0.13.5"
+    "@devvit/web": "0.13.5"
   },
   "devDependencies": {
     "@types/node": "22.20.0",
+    "devvit": "0.13.5",
     "esbuild": "0.28.1",
     "typescript": "6.0.3",
     "vitest": "^4.1.9"
+  },
+  "overrides": {
+    "protobufjs": "8.6.5",
+    "tmp": "0.2.7",
+    "ws": "8.21.0"
   }
 }

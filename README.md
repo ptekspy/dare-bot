@@ -16,7 +16,7 @@ Tracked posts get a bot comment containing two history sections:
 - `Playbook Dares`: wiki-matched dares from posts with the `Playbook` flair.
 - `Community Dares`: user-submitted dares from posts with the `DARED BY` flair.
 
-Each section shows the newest 5 rows in a markdown table. Older rows are rendered as spoiler lines underneath the table because Reddit comments do not support a real accordion component. Post titles are hyperlinks to the original posts.
+Each section shows the newest 5 rows in a markdown table. Older rows are summarized by count instead of being rendered in full, which keeps comments inside Reddit limits for high-volume users. Post titles are hyperlinks to the original posts.
 
 Internal review state is stored as `pending`, `accepted`, or `rejected`, but that status is not displayed in the public table.
 
@@ -45,6 +45,8 @@ Configured triggers:
 - `playbookBackfill` scheduler task: continues chunked historical syncs.
 
 When a tracked post changes, the bot updates the history comments it knows about for that user. If Redis has lost the comment id, the bot attempts to recover the existing history comment from the post before creating a new one.
+
+For production safety, old comment updates are capped per run and processed in small batches. This prevents one flair change or review action from trying to edit thousands of historical comments at once.
 
 ## Historical Sync Model
 
@@ -122,13 +124,7 @@ Response shape:
 }
 ```
 
-Manual rescan:
-
-```txt
-/api/user-dares?username=SomeUsername&refresh=1&limit=5000
-```
-
-Use manual refresh sparingly. It performs an immediate scan in the request path, while production trigger flow uses the safer chunked scheduler.
+The public API is read-only. Manual refresh through `/api/user-dares?refresh=1` is disabled because it can trigger expensive Reddit scans. Production syncs are performed by the safer chunked scheduler after tracked posts are detected.
 
 ## Local Development
 
@@ -244,6 +240,9 @@ npm run launch
 
 - The wiki page is the source of truth for Playbook dare names.
 - Flair matching is case-insensitive and checks whether the flair text contains `playbook` or `dared by`.
-- Reddit markdown does not support real buttons or accordions inside comments; Devvit menus and spoiler lines are used instead.
+- Trigger payloads are re-validated against the canonical Reddit post before being stored.
+- The bot only tracks posts from `r/daresgonewild`; non-target subreddit events are ignored.
+- Moderator review actions verify the acting user is a current subreddit moderator server-side.
+- Reddit markdown does not support real buttons or accordions inside comments; Devvit menus and bounded summary rows are used instead.
 - Old Redis namespaces are ignored after a namespace bump, but remain stored by Reddit/Devvit.
 - Generated starter webview files were removed because this app is trigger/menu/scheduler driven.

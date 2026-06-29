@@ -58,12 +58,7 @@ export function renderPlaybookTable(
   }
 
   if (older.length > 0) {
-    lines.push("", `Older ${title.toLowerCase()} (${older.length})`);
-    for (const dare of older) {
-      lines.push(
-        `>!${formatDate(dare.createdUtc)} - ${dare.name} - ${postTitleLink(dare)}!<`,
-      );
-    }
+    lines.push("", `Older ${title.toLowerCase()}: ${older.length} more stored.`);
   }
 
   return lines;
@@ -98,12 +93,7 @@ export function renderCommunityTable(
   }
 
   if (older.length > 0) {
-    lines.push("", `Older ${title.toLowerCase()} (${older.length})`);
-    for (const dare of older) {
-      lines.push(
-        `>!${formatDate(dare.createdUtc)} - ${dare.name} - ${formatUserLinks(dare.daredBy ?? [])} - ${postTitleLink(dare)}!<`,
-      );
-    }
+    lines.push("", `Older ${title.toLowerCase()}: ${older.length} more stored.`);
   }
 
   return lines;

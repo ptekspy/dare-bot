@@ -1,9 +1,13 @@
 import { reddit, redis } from "@devvit/web/server";
 import type { PostV2 } from "@devvit/shared";
 import type { T3 } from "@devvit/web/shared";
-import { DEFAULT_SCAN_LIMIT } from "./config.ts";
+import {
+  DEFAULT_SCAN_LIMIT,
+  PLAYBOOK_SUBREDDIT,
+  isTargetSubreddit,
+} from "./config.ts";
 import { runBackfillChunk } from "./backfill.ts";
-import { completionFromPost, completionFromTriggerPost } from "./completion-factory.ts";
+import { completionFromPost } from "./completion-factory.ts";
 import {
   clearPostAuthor,
   deleteCompletionEntries,
@@ -61,6 +65,24 @@ async function refreshKnownHistoryComments(
   return body;
 }
 
+async function isModerator(username: string | undefined): Promise<boolean> {
+  if (!username) return false;
+
+  const moderators = await reddit
+    .getModerators({
+      subredditName: PLAYBOOK_SUBREDDIT,
+      username: normalizeUsername(username),
+      limit: 1,
+      pageSize: 1,
+    })
+    .all();
+
+  return moderators.some(
+    (moderator) =>
+      moderator.username?.toLowerCase() === normalizeUsername(username),
+  );
+}
+
 async function removeCompletionForPost(postId: string): Promise<UntrackPostResult> {
   const barePostId = bareThingId(postId);
   const post = await reddit.getPostById(thingId(barePostId, "t3") as T3);
@@ -97,7 +119,12 @@ async function removeCompletionForPost(postId: string): Promise<UntrackPostResul
 export async function removeCompletionForDeletedPost(
   postId: string,
   authorName?: string,
+  subredditName?: string,
 ): Promise<UntrackPostResult> {
+  if (!isTargetSubreddit(subredditName)) {
+    return { untracked: false, reason: "ignored non-target subreddit" };
+  }
+
   const barePostId = bareThingId(postId);
   const storedAuthorName = authorName ?? (await getStoredPostAuthor(barePostId));
 
@@ -146,37 +173,54 @@ export async function trackTriggerPostAndComment(
 ): Promise<TrackPostResult> {
   if (!post) return { tracked: false, reason: "missing post payload" };
   if (!authorName) return { tracked: false, reason: "missing author payload" };
+  if (!isTargetSubreddit(subredditName)) {
+    return { tracked: false, reason: "ignored non-target subreddit" };
+  }
   if (!isTrackedDareFlair(post.linkFlair?.text)) {
     return { tracked: false, reason: "not tracked dare flair" };
   }
 
+  const canonicalPost = await reddit.getPostById(thingId(post.id, "t3") as T3);
+  if (canonicalPost.subredditName.toLowerCase() !== PLAYBOOK_SUBREDDIT) {
+    return { tracked: false, reason: "ignored non-target subreddit" };
+  }
+  if (normalizeUsername(canonicalPost.authorName) !== normalizeUsername(authorName)) {
+    return { tracked: false, reason: "post author did not match event author" };
+  }
+  if (!isTrackedDareFlair(canonicalPost.flair?.text)) {
+    return { tracked: false, reason: "not tracked dare flair" };
+  }
+
   if (
-    isCommunityDareFlair(post.linkFlair?.text) &&
-    !hasDaredByUser(post.title, post.selftext)
+    isCommunityDareFlair(canonicalPost.flair?.text) &&
+    !hasDaredByUser(canonicalPost.title, canonicalPost.body)
   ) {
-    await queuePostForMissingDaredBy(post.id);
+    await queuePostForMissingDaredBy(canonicalPost.id);
     return {
       tracked: false,
       reason: "DARED BY flair missing daredby u/username; queued for mod review",
     };
   }
 
-  const dare = await resolveDareForPost(post.title, post.linkFlair?.text);
+  const dare = await resolveDareForPost(
+    canonicalPost.title,
+    canonicalPost.flair?.text,
+  );
   if (!dare) {
     return { tracked: false, reason: "title did not match a tracked dare" };
   }
 
-  const completed = completionFromTriggerPost(post, authorName, dare);
+  const completed = completionFromPost(canonicalPost, dare);
   await saveCompletion(completed);
 
-  await addPendingHistoryPost(authorName, post.id, subredditName);
+  await addPendingHistoryPost(authorName, canonicalPost.id, subredditName);
   const backfillRunning = await startBackfillUser(authorName, subredditName);
   if (backfillRunning) {
     return { tracked: true, dare: completed };
   }
 
   const body = await refreshKnownHistoryComments(authorName);
-  await upsertHistoryComment(post.id, body);
+  await upsertHistoryComment(canonicalPost.id, body);
 
   return { tracked: true, dare: completed };
 }
@@ -187,6 +231,9 @@ export async function handleTriggerPostFlairUpdate(
   subredditName: string | undefined,
 ): Promise<TrackPostResult | UntrackPostResult> {
   if (!post) return { untracked: false, reason: "missing post payload" };
+  if (!isTargetSubreddit(subredditName)) {
+    return { untracked: false, reason: "ignored non-target subreddit" };
+  }
 
   if (isTrackedDareFlair(post.linkFlair?.text)) {
     return trackTriggerPostAndComment(post, authorName, subredditName);
@@ -200,6 +247,10 @@ export async function reviewPlaybookDare(
   status: Exclude<ReviewStatus, "pending">,
   reviewedBy?: string,
 ): Promise<TrackPostResult> {
+  if (!(await isModerator(reviewedBy))) {
+    return { tracked: false, reason: "review action is moderator-only" };
+  }
+
   let postId = targetId;
 
   if (targetId.startsWith("t1_")) {
@@ -211,6 +262,9 @@ export async function reviewPlaybookDare(
   }
 
   const post = await reddit.getPostById(thingId(postId, "t3") as T3);
+  if (post.subredditName.toLowerCase() !== PLAYBOOK_SUBREDDIT) {
+    return { tracked: false, reason: "ignored non-target subreddit" };
+  }
   if (!isTrackedDareFlair(post.flair?.text)) {
     return { tracked: false, reason: "not tracked dare flair" };
   }
@@ -251,7 +305,7 @@ export async function scanUserDares(
   subredditName?: string,
 ): Promise<ScanUserResult> {
   const cleanUsername = normalizeUsername(username);
-  const cleanSubredditName = subredditName?.toLowerCase();
+  const cleanSubredditName = (subredditName ?? PLAYBOOK_SUBREDDIT).toLowerCase();
   const dares = await fetchPlaybookDares();
   const posts = await reddit
     .getPostsByUser({

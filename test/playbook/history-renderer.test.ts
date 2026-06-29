@@ -62,8 +62,8 @@ describe("history comment rendering", () => {
       ),
     );
 
-    expect(body).toContain("Older playbook dares (1)");
-    expect(body).toContain(">!2023-11-14 - Dare 1 - [Post 1]");
+    expect(body).toContain("Older playbook dares: 1 more stored.");
+    expect(body).not.toContain(">!2023-11-14 - Dare 1 - [Post 1]");
     expect(body).toContain("| 2023-11-14 | Dare 6 | [Post 6]");
   });
 });

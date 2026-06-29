@@ -1,5 +1,10 @@
 import { reddit, scheduler } from "@devvit/web/server";
-import { BACKFILL_CHUNK_SIZE } from "./config.ts";
+import {
+  BACKFILL_CHUNK_SIZE,
+  HISTORY_COMMENT_UPDATE_CONCURRENCY,
+  MAX_HISTORY_COMMENT_UPDATES_PER_RUN,
+  isTargetSubreddit,
+} from "./config.ts";
 import { isCommunityDareFlair, isPlaybookFlair, isTrackedDareFlair } from "./flair.ts";
 import { bareThingId, normalizeUsername } from "./ids.ts";
 import { matchDareFromTitle, resolveDareFromTitleAndFlair } from "./dare-matching.ts";
@@ -82,17 +87,27 @@ async function updateHistoryTablesAfterBackfill(
   const completed = await getCompletedDares(username);
   const body = buildHistoryComment(username, completed);
   const pendingPostIds = await getPendingHistoryPostIds(username, subredditName);
+  const recentPostIds = completed
+    .sort((a, b) => b.createdUtc - a.createdUtc || a.postId.localeCompare(b.postId))
+    .slice(0, MAX_HISTORY_COMMENT_UPDATES_PER_RUN)
+    .map((dare) => bareThingId(dare.postId));
   const postIds = new Set<string>([
-    ...completed.map((dare) => bareThingId(dare.postId)),
+    ...recentPostIds,
     ...pendingPostIds.map(bareThingId),
   ]);
 
-  await Promise.allSettled(
-    [...postIds].map((postId) => updateExistingHistoryComment(postId, body)),
-  );
-  await Promise.allSettled(
-    pendingPostIds.map((postId) => upsertHistoryComment(postId, body)),
-  );
+  const boundedPostIds = [...postIds].slice(0, MAX_HISTORY_COMMENT_UPDATES_PER_RUN);
+  for (let i = 0; i < boundedPostIds.length; i += HISTORY_COMMENT_UPDATE_CONCURRENCY) {
+    const batch = boundedPostIds.slice(i, i + HISTORY_COMMENT_UPDATE_CONCURRENCY);
+    await Promise.allSettled(
+      batch.map((postId) => updateExistingHistoryComment(postId, body)),
+    );
+  }
+
+  for (let i = 0; i < pendingPostIds.length; i += HISTORY_COMMENT_UPDATE_CONCURRENCY) {
+    const batch = pendingPostIds.slice(i, i + HISTORY_COMMENT_UPDATE_CONCURRENCY);
+    await Promise.allSettled(batch.map((postId) => upsertHistoryComment(postId, body)));
+  }
   await clearPendingHistoryPosts(username, subredditName);
 }
 
@@ -109,6 +124,8 @@ async function finishBackfill(
 }
 
 export async function runBackfillChunk(data: BackfillTaskData): Promise<void> {
+  if (!isTargetSubreddit(data.subredditName)) return;
+
   const username = normalizeUsername(data.username);
   const subredditName = data.subredditName;
   const state = await getBackfillState(username, subredditName);
