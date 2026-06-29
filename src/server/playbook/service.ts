@@ -172,19 +172,18 @@ export async function trackTriggerPostAndComment(
   subredditName: string | undefined,
 ): Promise<TrackPostResult> {
   if (!post) return { tracked: false, reason: "missing post payload" };
-  if (!authorName) return { tracked: false, reason: "missing author payload" };
-  if (!isTargetSubreddit(subredditName)) {
+  if (subredditName && !isTargetSubreddit(subredditName)) {
     return { tracked: false, reason: "ignored non-target subreddit" };
-  }
-  if (!isTrackedDareFlair(post.linkFlair?.text)) {
-    return { tracked: false, reason: "not tracked dare flair" };
   }
 
   const canonicalPost = await reddit.getPostById(thingId(post.id, "t3") as T3);
   if (canonicalPost.subredditName.toLowerCase() !== PLAYBOOK_SUBREDDIT) {
     return { tracked: false, reason: "ignored non-target subreddit" };
   }
-  if (normalizeUsername(canonicalPost.authorName) !== normalizeUsername(authorName)) {
+  if (
+    authorName &&
+    normalizeUsername(canonicalPost.authorName) !== normalizeUsername(authorName)
+  ) {
     return { tracked: false, reason: "post author did not match event author" };
   }
   if (!isTrackedDareFlair(canonicalPost.flair?.text)) {
@@ -213,13 +212,16 @@ export async function trackTriggerPostAndComment(
   const completed = completionFromPost(canonicalPost, dare);
   await saveCompletion(completed);
 
-  await addPendingHistoryPost(authorName, canonicalPost.id, subredditName);
-  const backfillRunning = await startBackfillUser(authorName, subredditName);
+  await addPendingHistoryPost(canonicalPost.authorName, canonicalPost.id, subredditName);
+  const backfillRunning = await startBackfillUser(
+    canonicalPost.authorName,
+    subredditName,
+  );
   if (backfillRunning) {
     return { tracked: true, dare: completed };
   }
 
-  const body = await refreshKnownHistoryComments(authorName);
+  const body = await refreshKnownHistoryComments(canonicalPost.authorName);
   await upsertHistoryComment(canonicalPost.id, body);
 
   return { tracked: true, dare: completed };
@@ -231,12 +233,22 @@ export async function handleTriggerPostFlairUpdate(
   subredditName: string | undefined,
 ): Promise<TrackPostResult | UntrackPostResult> {
   if (!post) return { untracked: false, reason: "missing post payload" };
-  if (!isTargetSubreddit(subredditName)) {
+  if (subredditName && !isTargetSubreddit(subredditName)) {
     return { untracked: false, reason: "ignored non-target subreddit" };
   }
 
   if (isTrackedDareFlair(post.linkFlair?.text)) {
-    return trackTriggerPostAndComment(post, authorName, subredditName);
+    return trackTriggerPostAndComment(post, undefined, subredditName);
+  }
+
+  if (!post.linkFlair?.text) {
+    const canonicalPost = await reddit.getPostById(thingId(post.id, "t3") as T3);
+    if (canonicalPost.subredditName.toLowerCase() !== PLAYBOOK_SUBREDDIT) {
+      return { untracked: false, reason: "ignored non-target subreddit" };
+    }
+    if (isTrackedDareFlair(canonicalPost.flair?.text)) {
+      return trackTriggerPostAndComment(post, undefined, canonicalPost.subredditName);
+    }
   }
 
   return removeCompletionForPost(post.id);
