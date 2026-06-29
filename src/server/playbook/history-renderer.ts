@@ -10,10 +10,10 @@ function escapeLinkText(value: string): string {
   return escapeTableCell(value).replace(/\]/g, "\\]");
 }
 
-function formatUserLinks(usernames: string[]): string {
+function formatUsernames(usernames: string[]): string {
   if (usernames.length === 0) return "-";
 
-  return usernames.map((username) => `u/${username}`).join(", ");
+  return usernames.join(", ");
 }
 
 function formatDate(createdUtc: number): string {
@@ -86,7 +86,7 @@ export function renderCommunityTable(
     const cells = [
       formatDate(dare.createdUtc),
       escapeTableCell(dare.name),
-      escapeTableCell(formatUserLinks(dare.daredBy ?? [])),
+      escapeTableCell(formatUsernames(dare.daredBy ?? [])),
       postTitleLink(dare),
     ];
     lines.push(`| ${cells.join(" | ")} |`);
@@ -108,7 +108,7 @@ export function buildHistoryComment(
     isCommunityDareFlair(dare.flair),
   );
   const lines = [
-    `Playbook history for u/${username}`,
+    `Playbook history for ${username}`,
     "",
     ...renderPlaybookTable("Playbook Dares", playbookDares),
     "",

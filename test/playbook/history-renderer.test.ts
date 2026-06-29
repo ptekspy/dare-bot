@@ -34,7 +34,9 @@ describe("history comment rendering", () => {
     expect(body).toContain("## Playbook Dares");
     expect(body).toContain("## Community Dares");
     expect(body).toContain("| Date | Dare | Dared by | Post |");
-    expect(body).toContain("u/Alice");
+    expect(body).toContain("Playbook history for example");
+    expect(body).toContain("| 2023-11-14 | Sunny day | Alice | ");
+    expect(body).not.toContain("Playbook history for u/example");
   });
 
   it("links post titles and hides internal review status", () => {
