@@ -23,7 +23,7 @@
     "@types/node": "22.20.0",
     "devvit": "0.13.5",
     "esbuild": "0.28.1",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vitest": "^4.1.9"
   },
   "overrides": {
